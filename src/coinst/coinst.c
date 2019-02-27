@@ -71,6 +71,9 @@ __user_code;
 
 #define MONITOR_NAME    "XENBUS_MONITOR"
 
+#define HDC_CLASS       "{4d36e96a-e325-11ce-bfc1-08002be10318}"
+#define SYSTEM_CLASS    "{4d36e97d-e325-11ce-bfc1-08002be10318}"
+
 static VOID
 #pragma prefast(suppress:6262) // Function uses '1036' bytes of stack: exceeds /analyze:stacksize'1024'
 __Log(
@@ -1704,6 +1707,126 @@ fail1:
     return FALSE;
 }
 
+static BOOLEAN
+SetServiceStart(
+    LPCSTR  Service,
+    DWORD   StartValue
+)
+{
+    HKEY        Key;
+    TCHAR       ServiceKeyName[MAX_PATH];
+    HRESULT     Error;
+
+    Error = StringCbPrintf(ServiceKeyName,
+                           MAX_PATH,
+                           SERVICES_KEY "\\%s",
+                           Service);
+    assert(SUCCEEDED(Error));
+
+    Error = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                         ServiceKeyName,
+                         0,
+                         KEY_ALL_ACCESS,
+                         &Key);
+    if (Error != ERROR_SUCCESS) {
+        SetLastError(Error);
+        goto fail1;
+    }
+
+    Error = RegSetValueEx(Key,
+                          "start",
+                          0,
+                          REG_DWORD,
+                          (LPBYTE)&StartValue,
+                          (DWORD)sizeof(DWORD));
+    if (Error != ERROR_SUCCESS) {
+        SetLastError(Error);
+        goto fail2;
+    }
+
+    RegCloseKey(Key);
+
+    return TRUE;
+
+fail2:
+    Log("fail2");
+
+    RegCloseKey(Key);
+
+fail1:
+    Error = GetLastError();
+
+    {
+        PTCHAR  Message;
+
+        Message = GetErrorMessage(Error);
+        Log("fail1 (%s)", Message);
+        LocalFree(Message);
+    }
+
+    return FALSE;
+}
+
+static BOOLEAN
+SetUpperFilterForClass(
+    LPCSTR      Class,
+    LPCSTR      UpperFilter /* A single double-null-terminated upper filter */
+)
+{
+    HKEY        Key;
+    TCHAR       ClassKeyName[MAX_PATH];
+    HRESULT     Error;
+
+    Error = StringCbPrintf(ClassKeyName,
+                           MAX_PATH,
+                           CLASS_KEY "\\%s",
+                           Class);
+    assert(SUCCEEDED(Error));
+
+    Error = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+                         ClassKeyName,
+                         0,
+                         KEY_ALL_ACCESS,
+                         &Key);
+    if (Error != ERROR_SUCCESS) {
+        SetLastError(Error);
+        goto fail1;
+    }
+
+    Error = RegSetValueEx(Key,
+                          "UpperFilters",
+                          0,
+                          REG_MULTI_SZ,
+                          (LPBYTE)UpperFilter,
+                          (DWORD)strlen(UpperFilter) + 2);
+    if (Error != ERROR_SUCCESS) {
+        SetLastError(Error);
+        goto fail2;
+    }
+
+    RegCloseKey(Key);
+
+    return TRUE;
+
+fail2:
+    Log("fail2");
+
+    RegCloseKey(Key);
+
+fail1:
+    Error = GetLastError();
+
+    {
+        PTCHAR  Message;
+
+        Message = GetErrorMessage(Error);
+        Log("fail1 (%s)", Message);
+        LocalFree(Message);
+    }
+
+    return FALSE;
+}
+
 static HRESULT
 DifInstallPreProcess(
     IN  HDEVINFO                    DeviceInfoSet,
@@ -1872,6 +1995,12 @@ DifRemovePreProcess(
     Log("====>");
 
     (VOID) MonitorDelete();
+    (VOID) SetUpperFilterForClass(HDC_CLASS, "\0");
+    (VOID) SetUpperFilterForClass(SYSTEM_CLASS, "\0");
+    (VOID) SetServiceStart("xenbus", SERVICE_DEMAND_START);
+    (VOID) SetServiceStart("xenfilt", SERVICE_DEMAND_START);
+    (VOID) SetServiceStart("xendisk", SERVICE_DEMAND_START);
+    (VOID) SetServiceStart("xenvbd", SERVICE_DEMAND_START);
 
     Log("<====");
 
