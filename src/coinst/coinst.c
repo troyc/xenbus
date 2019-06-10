@@ -1959,6 +1959,9 @@ Entry(
     )
 {
     HRESULT                         Error;
+    SP_DRVINFO_DATA                 DriverInfoData;
+    BOOLEAN                         DriverInfoAvailable;
+    BOOLEAN                         IsNullDriver;
 
     Log("%s (%s) ===>",
         MAJOR_VERSION_STR "." MINOR_VERSION_STR "." MICRO_VERSION_STR "." BUILD_NUMBER_STR,
@@ -1973,23 +1976,28 @@ Entry(
             Context->InstallResult);
     }
 
+    DriverInfoData.cbSize = sizeof(DriverInfoData);
+    DriverInfoAvailable = SetupDiGetSelectedDriver(DeviceInfoSet,
+                                                   DeviceInfoData,
+                                                   &DriverInfoData) ?
+                          TRUE :
+                          FALSE;
+    IsNullDriver = !(DriverInfoAvailable &&
+                    (DriverInfoData.DriverType == SPDIT_CLASSDRIVER || DriverInfoData.DriverType == SPDIT_COMPATDRIVER));
+
     switch (Function) {
+	case DIF_SELECTBESTCOMPATDRV: {
+        // If the NULL driver will be installed, treat this as we would a DIF_REMOVE
+        // to work around the fact that Windows 10 2004 doesn't call DIF_INSTALLDEVICE on uninstall.
+        Error = (IsNullDriver) ?
+                DifRemove(DeviceInfoSet, DeviceInfoData, Context) :
+                NO_ERROR;
+        break;
+    }
     case DIF_INSTALLDEVICE: {
-        SP_DRVINFO_DATA         DriverInfoData;
-        BOOLEAN                 DriverInfoAvailable;
-
-        DriverInfoData.cbSize = sizeof (DriverInfoData);
-        DriverInfoAvailable = SetupDiGetSelectedDriver(DeviceInfoSet,
-                                                       DeviceInfoData,
-                                                       &DriverInfoData) ?
-                              TRUE :
-                              FALSE;
-
-        // If there is no driver information then the NULL driver is being
-        // installed. Treat this as we would a DIF_REMOVE.
-        Error = (DriverInfoAvailable) ?
-                DifInstall(DeviceInfoSet, DeviceInfoData, Context) :
-                DifRemove(DeviceInfoSet, DeviceInfoData, Context);
+        Error = (IsNullDriver) ?
+                NO_ERROR :
+                DifInstall(DeviceInfoSet, DeviceInfoData, Context);
         break;
     }
     case DIF_REMOVE:
