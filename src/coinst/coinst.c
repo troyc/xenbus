@@ -1974,6 +1974,25 @@ Entry(
     }
 
     switch (Function) {
+	case DIF_SELECTBESTCOMPATDRV: {
+        SP_DRVINFO_DATA         DriverInfoData;
+        BOOLEAN                 DriverInfoAvailable;
+
+        DriverInfoData.cbSize = sizeof(DriverInfoData);
+        DriverInfoAvailable = SetupDiGetSelectedDriver(DeviceInfoSet,
+            DeviceInfoData,
+            &DriverInfoData)
+            && (DriverInfoData.DriverType == SPDIT_CLASSDRIVER || DriverInfoData.DriverType == SPDIT_COMPATDRIVER);
+
+        // If there is no driver information then the NULL driver will be
+        // installed. Treat this as we would a DIF_REMOVE.
+            if (!DriverInfoAvailable) {
+                Error = DifRemove(DeviceInfoSet, DeviceInfoData, Context);
+            } else {
+                Error = NO_ERROR;
+            }
+        break;
+    }
     case DIF_INSTALLDEVICE: {
         SP_DRVINFO_DATA         DriverInfoData;
         BOOLEAN                 DriverInfoAvailable;
@@ -1981,15 +2000,14 @@ Entry(
         DriverInfoData.cbSize = sizeof (DriverInfoData);
         DriverInfoAvailable = SetupDiGetSelectedDriver(DeviceInfoSet,
                                                        DeviceInfoData,
-                                                       &DriverInfoData) ?
-                              TRUE :
-                              FALSE;
+                                                       &DriverInfoData)
+                              && (DriverInfoData.DriverType == SPDIT_CLASSDRIVER || DriverInfoData.DriverType == SPDIT_COMPATDRIVER);
 
         // If there is no driver information then the NULL driver is being
-        // installed. Treat this as we would a DIF_REMOVE.
+        // installed. Return with NO_ERROR as per Windows documentation.
         Error = (DriverInfoAvailable) ?
                 DifInstall(DeviceInfoSet, DeviceInfoData, Context) :
-                DifRemove(DeviceInfoSet, DeviceInfoData, Context);
+                NO_ERROR;
         break;
     }
     case DIF_REMOVE:
