@@ -82,7 +82,7 @@ Set-Item -Path Env:MAJOR_VERSION -Value '9'
 Set-Item -Path Env:MINOR_VERSION -Value '1'
 Set-Item -Path Env:MICRO_VERSION -Value '0'
 
-Build "x86" $Type
+#Build "x86" $Type
 Build "x64" $Type
 
 if ($Sdv) {

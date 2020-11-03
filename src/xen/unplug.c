@@ -120,9 +120,9 @@ UnplugDeviceType(
         break;
     case UNPLUG_NICS:
 #pragma prefast(suppress:28138)
-        WRITE_PORT_USHORT((PUSHORT)0x10, 0x0002);
+        //WRITE_PORT_USHORT((PUSHORT)0x10, 0x0002);
 
-        LogPrintf(LOG_LEVEL_WARNING, "UNPLUG: NICS\n");
+        LogPrintf(LOG_LEVEL_WARNING, "AXA NO UNPLUG: NICS\n");
         break;
     default:
         ASSERT(FALSE);
